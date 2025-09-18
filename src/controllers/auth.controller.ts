@@ -1,9 +1,11 @@
 
 import { Request, Response } from 'express';
-import { loginUser, logoutUser, registerUser } from '../services/auth.service';
+import { loginUser, logoutUser, registerUser} from '../services/auth.service';
 import * as jwt from 'jsonwebtoken';
+import { registerUser as registerService} from '../services/auth.service';
 import { PrismaClient } from '@prisma/client';
 import { AccessTokenPayload, JwtUserPayload, RefreshTokenPayload } from '../types/jwt.types';
+import { logAuditEvent } from '../services/audit.service'; 
 
 
 declare global {
@@ -19,15 +21,21 @@ export const register = async (req: Request, res: Response) => {
   try {
     const { email, password, role } = req.body;
 
-    // Validación básica
     if (!email || !password || !role) {
       return res.status(400).json({
         message: 'Todos los campos (email, password, role) son obligatorios.'
       });
     }
 
-   
-    const newUser = await registerUser(email, password, role);
+    const newUser = await registerService(email, password, role); // ¡Usamos el alias aquí!
+
+    // Registrar evento de auditoría
+    await logAuditEvent('USER_REGISTER', {
+      email: newUser.email,
+      role: newUser.role,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
 
     return res.status(201).json({
       message: 'Usuario registrado exitosamente',
@@ -58,6 +66,14 @@ export const login = async (req: Request, res: Response) => {
     }
 
     const { accessToken, refreshToken, user } = await loginUser(email, password);
+
+    // Registrar evento de auditoría
+    await logAuditEvent('USER_LOGIN', {
+      email: user.email,
+      role: user.role,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    }, user.id); // Pasamos el userId
 
     return res.status(200).json({
       message: 'Inicio de sesión exitoso',
@@ -128,8 +144,20 @@ export const logout = async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Token de acceso requerido' });
     }
 
-    // Llamar al servicio para invalidar el token
+     // Obtenemos el userId del token (sin verificar firma, solo para auditoría)
+    const decoded: any = jwt.decode(token);
+    const userId = decoded?.userId;
+        // Llamar al servicio para invalidar el token
     const result = await logoutUser(token);
+
+    // Registrar evento de auditoría
+    await logAuditEvent('USER_LOGOUT', {
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    }, userId); // Pasamos el userId si está disponible
+
+
+
 
     return res.status(200).json(result);
   } catch (error: any) {
@@ -140,3 +168,5 @@ export const logout = async (req: Request, res: Response) => {
     });
   }
 };
+
+
