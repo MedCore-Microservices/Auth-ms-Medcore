@@ -69,3 +69,25 @@ export const loginUser = async (email: string, password: string) => {
     }
   };
 };
+
+export const logoutUser = async (token: string) => {
+  // Decodificar el token para obtener su expiración (sin verificar la firma aún)
+  const decoded: any = jwt.decode(token);
+
+  if (!decoded || !decoded.exp) {
+    throw new Error('Token inválido');
+  }
+
+  // Convertir exp (timestamp) a Date
+  const expiresAt = new Date(decoded.exp * 1000);
+
+  // Guardar el token en la blacklist
+  await prisma.tokenBlacklist.create({
+    data: {
+      token, // Guardamos el token completo para simplicidad
+      expiresAt
+    }
+  });
+
+  return { message: 'Sesión cerrada exitosamente' };
+};

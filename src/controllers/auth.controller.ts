@@ -1,6 +1,6 @@
 
 import { Request, Response } from 'express';
-import { loginUser, registerUser } from '../services/auth.service';
+import { loginUser, logoutUser, registerUser } from '../services/auth.service';
 import * as jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 import { AccessTokenPayload, JwtUserPayload, RefreshTokenPayload } from '../types/jwt.types';
@@ -116,4 +116,27 @@ export const refreshToken = async (req: Request, res: Response) => {
     message: 'Token de acceso renovado',
     accessToken: newAccessToken
   });
+};
+
+
+export const logout = async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ message: 'Token de acceso requerido' });
+    }
+
+    // Llamar al servicio para invalidar el token
+    const result = await logoutUser(token);
+
+    return res.status(200).json(result);
+  } catch (error: any) {
+    console.error('Error en logout:', error);
+    return res.status(500).json({
+      message: 'Error al cerrar sesión',
+      error: error.message
+    });
+  }
 };

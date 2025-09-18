@@ -15,3 +15,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model TokenBlacklist {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique // El token que ha sido revocado
+  expiresAt DateTime // Fecha de expiración original del token
+  createdAt DateTime @default(now())
+}
