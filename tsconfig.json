@@ -12,6 +12,7 @@
     "sourceMap": true,
     "declaration": false,
     "declarationMap": false,
+    "typeRoots": ["./node_modules/@types", "./src/types"],
     "types": ["node"]
   },
   "include": ["src/**/*"],

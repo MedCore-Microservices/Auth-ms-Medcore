@@ -1,38 +1,29 @@
-
+// src/middleware/auth.middleware.ts
 import { Request, Response, NextFunction } from 'express';
 import * as jwt from 'jsonwebtoken';
+import { AccessTokenPayload } from '../types/jwt.types'; // Importamos el tipo
 
-interface JwtPayload {
-  userId: number;
-  email: string;
-  role: string;
-}
-
-declare global {
-  namespace Express {
-    interface Request {
-      user?: JwtPayload; // Extendemos el tipo Request para incluir 'user'
-    }
-  }
-}
 
 export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
-  // 1. Obtener el token del header "Authorization"
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // "Bearer TOKEN"
+  const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
     return res.status(401).json({ message: 'Token de acceso requerido' });
   }
 
-  // 2. Verificar y decodificar el token
-  jwt.verify(token, process.env.JWT_SECRET!, (err, user) => {
+  // Tipamos explícitamente los parámetros del callback
+  jwt.verify(token, process.env.JWT_SECRET!, (err: jwt.VerifyErrors | null, user: unknown) => {
     if (err) {
       return res.status(403).json({ message: 'Token inválido o expirado' });
     }
 
-    // 3. Adjuntar la información del usuario al objeto 'req'
-    req.user = user as JwtPayload;
-    next(); // Pasar al siguiente middleware o controlador
+    // Verificamos que el payload tiene la estructura esperada
+    if (typeof user !== 'object' || user === null || !('userId' in user) || !('email' in user) || !('role' in user)) {
+      return res.status(403).json({ message: 'Token con formato inválido' });
+    }
+
+    req.user = user as AccessTokenPayload;
+    next();
   });
 };
