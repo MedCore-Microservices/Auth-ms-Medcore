@@ -7,13 +7,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  ADMIN
+  DOCTOR
+  NURSE
+  PATIENT
+}
+
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
-  role      String   // Ej: "admin", "doctor", "nurse", "patient"
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  Int       @id @default(autoincrement())
+  email               String    @unique
+  fullname            String
+  status              String    @default("PENDING")
+  verificationCode    String?
+  verificationExpires DateTime?
+  currentPassword     String
+  role                Role      @default(PATIENT) //Por defecto es paciente
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   auditLogs AuditLog[]
 }
@@ -26,13 +37,11 @@ model TokenBlacklist {
 }
 
 model AuditLog {
-  id        Int       @id @default(autoincrement())
-  userId    Int?      // Opcional, porque en register el user aún no existe
-  action    String    // Ej: "USER_REGISTER", "USER_LOGIN", "USER_LOGOUT"
-  details   String?   // JSON string con detalles adicionales
-  timestamp DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  userId    Int? // Opcional, porque en register el user aún no existe
+  action    String // Ej: "USER_REGISTER", "USER_LOGIN", "USER_LOGOUT"
+  details   String? // JSON string con detalles adicionales
+  timestamp DateTime @default(now())
 
-   user      User?     @relation(fields: [userId], references: [id])
-  
- 
+  user User? @relation(fields: [userId], references: [id])
 }
