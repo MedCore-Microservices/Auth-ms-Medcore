@@ -2,33 +2,45 @@ import { PrismaClient,Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
 
+import { generateVerificationCode } from '../utils/generateCode'; 
+
+import { sendVerificationEmail } from '../config/emailConfig';
 const prisma = new PrismaClient();
 
-// Añadimos `fullname` como parámetro (es obligatorio)
 export const registerUser = async (
   email: string,
   password: string,
-  fullname: string, //  obligatorio
-  role:Role= 'PATIENT' // valor por defecto opcional en la función
+  fullname: string
 ) => {
-  const existingUser = await prisma.user.findUnique({
-    where: { email }
-  });
-
+  const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
     throw new Error('El correo electrónico ya está registrado.');
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
+  const code = generateVerificationCode(); // ✅ Genera el código
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos
 
+  //
   const newUser = await prisma.user.create({
     data: {
       email,
-      currentPassword: hashedPassword, 
-      fullname,                        //  obligatorio
-      role                            // Prisma acepta el string si coincide con el enum
+      currentPassword: hashedPassword,
+      fullname,
+      role: Role.PATIENT,
+      status: 'PENDING',              // estado inicial
+      verificationCode: code,         // código de 6 dígitos
+      verificationExpires: expiresAt, // fecha de expiración
     }
   });
+
+  // ✅ Envía el código por correo
+  try {
+    await sendVerificationEmail(email, fullname, code); // 👈 pasa el código
+  } catch (error) {
+    console.error('⚠️ No se pudo enviar el código de verificación:', error);
+    // Opcional: eliminar usuario si falla el correo
+  }
 
   return newUser;
 };
