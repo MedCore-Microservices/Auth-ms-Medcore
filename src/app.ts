@@ -7,7 +7,11 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: "http://localhost:3000", // ← frontend
+  credentials: true
+
+}));
 app.use(express.json()); // Para parsear el body de las peticiones JSON
 
 // Rutas

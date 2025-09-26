@@ -1,40 +1,21 @@
-# Etapa 1: Construcción con Node.js Alpine
-FROM node:20.14.0-alpine AS builder
+# Usa una imagen de Node.js
+FROM node:20-alpine
 
+# Directorio de trabajo
 WORKDIR /app
 
-# Actualizar paquetes del sistema (solo en build)
-RUN apk update && apk upgrade --no-cache
-
-# Copiar e instalar dependencias
+# Copia package.json y package-lock.json
 COPY package*.json ./
+
+# Instala todas las dependencias (incluyendo devDependencies, necesarias para compilar TS)
 RUN npm ci
 
-# Copiar todo el código fuente
+# Copia todo el código fuente
 COPY . .
-
-# Generar cliente Prisma (requiere schema.prisma)
 RUN npx prisma generate
 
-# Compilar TypeScript a JavaScript
+# Compila TypeScript → genera la carpeta dist/
 RUN npm run build
 
-
-# Etapa 2: Producción con Distroless (Google) — mínima superficie de ataque
-FROM gcr.io/distroless/nodejs20-debian12 AS production
-
-WORKDIR /app
-
-# Copiar solo lo necesario para ejecutar la app
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-
-# Puerto de la app 
-EXPOSE 3000
-
-# Comando para iniciar la app
-
-CMD ["dist/app.js"]
+# Ejecuta la app compilada
+CMD ["node", "dist/app.js"]
