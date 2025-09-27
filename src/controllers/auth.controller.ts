@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
-import { loginUser, logoutUser, registerUser as registerService } from '../services/auth.service';
+import { loginUser, logoutUser, registerUser as registerService,verifyEmailCode} from '../services/auth.service';
 import * as jwt from 'jsonwebtoken';
 import { AccessTokenPayload, RefreshTokenPayload } from '../types/jwt.types';
 import { logAuditEvent } from '../services/audit.service';
+import { resendVerificationCode } from './../services/auth.service';
 
 // Extensión de Express para incluir el payload del token
 declare global {
@@ -191,3 +192,70 @@ export const logout = async (req: Request, res: Response) => {
     });
   }
 };
+
+
+export const verifyEmail = async (req: Request, res: Response) => {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json({
+        message: 'Email y código de verificación son obligatorios.'
+      });
+    }
+
+    const result = await verifyEmailCode(email, code);
+
+    await logAuditEvent('EMAIL_VERIFIED', {
+      email: email,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    return res.status(200).json({
+      message: result.message,
+      user: result.user
+    });
+  } catch (error: any) {
+    console.error('Error en verificación de email:', error);
+    return res.status(400).json({
+      message: 'Error al verificar email',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Reenviar código de verificación
+ */
+export const resendVerification = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        message: 'Email es obligatorio.'
+      });
+    }
+
+    const result = await resendVerificationCode(email);
+
+    await logAuditEvent('VERIFICATION_CODE_RESENT', {
+      email: email,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    return res.status(200).json({
+      message: result.message,
+      expiresAt: result.expiresAt
+    });
+  } catch (error: any) {
+    console.error('Error al reenviar código:', error);
+    return res.status(400).json({
+      message: 'Error al reenviar código de verificación',
+      error: error.message
+    });
+  }
+};
+

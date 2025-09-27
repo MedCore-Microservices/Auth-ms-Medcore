@@ -5,7 +5,7 @@ import { AccessTokenPayload } from '../types/jwt.types';
 import { PrismaClient } from '@prisma/client';
 
 export const authenticateToken = async (req: Request, res: Response, next: NextFunction) => {
-  const prisma = new PrismaClient(); // 👈 dentro de la función
+  const prisma = new PrismaClient(); //  dentro de la función
 
   try {
     const authHeader = req.headers['authorization'];

@@ -54,6 +54,9 @@ export const loginUser = async (email: string, password: string) => {
     throw new Error('Credenciales inválidas');
   }
 
+    if (user.status !== 'ACTIVE') {
+    throw new Error('Por favor verifica tu email antes de iniciar sesión. Revisa tu bandeja de entrada.');
+  }
 
   const isPasswordValid = await bcrypt.compare(password, user.currentPassword);
 
@@ -101,4 +104,95 @@ export const logoutUser = async (token: string) => {
   });
 
   return { message: 'Sesión cerrada exitosamente' };
+};
+
+export const verifyEmailCode = async (email: string, code: string) => {
+  const user = await prisma.user.findUnique({
+    where: { email }
+  });
+
+  if (!user) {
+    throw new Error('Usuario no encontrado');
+  }
+
+  if (user.status === 'ACTIVE') {
+    throw new Error('La cuenta ya está verificada');
+  }
+
+  if (!user.verificationCode || !user.verificationExpires) {
+    throw new Error('Código de verificación no disponible');
+  }
+
+  // Verificar si el código expiró
+  if (new Date() > user.verificationExpires) {
+    throw new Error('El código de verificación ha expirado');
+  }
+
+  // Verificar si el código coincide
+  if (user.verificationCode !== code) {
+    throw new Error('Código de verificación incorrecto');
+  }
+
+  // Actualizar usuario a ACTIVO y limpiar código
+  const updatedUser = await prisma.user.update({
+    where: { email },
+    data: {
+      status: 'ACTIVE',
+      verificationCode: null,
+      verificationExpires: null,
+      updatedAt: new Date()
+    }
+  });
+
+  return {
+    message: 'Email verificado exitosamente. Tu cuenta ahora está activa.',
+    user: {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      status: updatedUser.status
+    }
+  };
+};
+
+/**
+ * Reenviar código de verificación
+ */
+export const resendVerificationCode = async (email: string) => {
+  const user = await prisma.user.findUnique({
+    where: { email }
+  });
+
+  if (!user) {
+    throw new Error('Usuario no encontrado');
+  }
+
+  if (user.status === 'ACTIVE') {
+    throw new Error('La cuenta ya está verificada');
+  }
+
+
+  const newCode = generateVerificationCode();
+  const newExpiresAt = new Date(Date.now() + 10 * 60 * 1000); 
+
+  await prisma.user.update({
+    where: { email },
+    data: {
+      verificationCode: newCode,
+      verificationExpires: newExpiresAt,
+      updatedAt: new Date()
+    }
+  });
+
+  
+  try {
+    await sendVerificationEmail(email, user.fullname, newCode);
+  } catch (error) {
+    console.error('Error al reenviar email de verificación:', error);
+    throw new Error('No se pudo enviar el email de verificación');
+  }
+
+  return {
+    message: 'Nuevo código de verificación enviado a tu email',
+    expiresAt: newExpiresAt
+  };
 };
