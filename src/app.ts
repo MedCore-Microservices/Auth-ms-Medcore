@@ -9,7 +9,9 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors({
   origin: "http://localhost:3000", // ← frontend
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'] 
 
 }));
 app.use(express.json()); // Para parsear el body de las peticiones JSON
