@@ -26,8 +26,37 @@ model User {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
+
+  medicalProfile      MedicalProfile?
+
   auditLogs AuditLog[]
 }
+
+model MedicalProfile {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @unique
+  specialization  String?  // Cardiología, Pediatría, etc.
+  department      String?  // Urgencias, Medicina Interna, etc.
+  licenseNumber   String?  // Número de licencia médica
+  phone           String?  // Teléfono de contacto
+  dateOfBirth     DateTime? // Fecha de nacimiento
+  address         String?  // Dirección
+  emergencyContact String? // Contacto de emergencia
+  bloodType       String?  // Tipo de sangre (A+, O-, etc.)
+  allergies       String?  // Alergias medicamentosas/alimenticias
+  chronicDiseases String?  // Enfermedades crónicas
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relación con User
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+
+
+
+
+
 
 model TokenBlacklist {
   id        Int      @id @default(autoincrement())
