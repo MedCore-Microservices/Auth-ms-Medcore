@@ -1,5 +1,11 @@
 import nodemailer from 'nodemailer';
 
+// === DEBUG CRÍTICO ===
+console.log('🔧 [EMAIL DEBUG] SMTP_USER:', process.env.SMTP_USER || 'NO CONFIGURADO');
+console.log('🔧 [EMAIL DEBUG] SMTP_PASSWORD:', process.env.SMTP_PASSWORD ? 'CONFIGURADO' : 'NO CONFIGURADO');
+console.log('🔧 [EMAIL DEBUG] NODE_ENV:', process.env.NODE_ENV);
+// === FIN DEBUG ===
+
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -7,6 +13,16 @@ const transporter = nodemailer.createTransport({
     pass: process.env.SMTP_PASSWORD,
   },
 });
+
+transporter.verify(function (error, success) {
+  if (error) {
+    console.log('❌ [EMAIL] Error conexión SMTP:', error);
+  } else {
+    console.log('✅ [EMAIL] Servidor SMTP listo para enviar');
+  }
+});
+
+
 
 export const sendVerificationEmail = async (
   to: string,
