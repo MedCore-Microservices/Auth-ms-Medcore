@@ -23,11 +23,18 @@ export const bulkCreateUsers = async (users: BulkUser[]) => {
     details: [] as any[]
   };
 
+  // Mapeo de roles del Excel al enum actualizado
+  const roleMap: { [key: string]: Role } = {
+    'MEDICO': Role.MEDICO,
+    'ENFERMERA': Role.ENFERMERA,
+    'ADMINISTRADOR': Role.ADMINISTRADOR,
+    'PACIENTE': Role.PACIENTE
+  };
+
   for (const userData of users) {
     try {
       console.log('Procesando usuario:', userData.email);
 
-      // Verificar si el usuario ya existe
       const existingUser = await prisma.user.findUnique({
         where: { email: userData.email }
       });
@@ -41,53 +48,55 @@ export const bulkCreateUsers = async (users: BulkUser[]) => {
         continue;
       }
 
-      // Hashear password
       const hashedPassword = await bcrypt.hash(userData.current_password, 10);
 
-      // Mapear rol del CSV al enum de Prisma
-      const roleMap: { [key: string]: Role } = {
-        'MEDICO': Role.DOCTOR,
-        'ENFERMERA': Role.NURSE,
-        'ADMINISTRADOR': Role.ADMIN,
-        'PACIENTE': Role.PATIENT
-      };
+      // Normalizar rol
+      const userRole = roleMap[userData.role?.toUpperCase()] || Role.PACIENTE;
 
-      const userRole = roleMap[userData.role.toUpperCase()] || Role.PATIENT;
+      // 1. Manejar Department (solo si aplica)
+      let departmentId: number | null = null;
+      if (userData.department) {
+        const dept = await prisma.department.upsert({
+          where: { name: userData.department.toUpperCase() },
+          update: {},
+          create: { name: userData.department.toUpperCase() }
+        });
+        departmentId = dept.id;
+      }
 
-      // PRIMERO crear el usuario
+      // 2. Manejar Specialization (solo para médicos)
+      let specializationId: number | null = null;
+      if (userData.specialization && userRole === Role.MEDICO) {
+        const spec = await prisma.specialization.upsert({
+          where: { name: userData.specialization.toUpperCase() },
+          update: {},
+          create: { name: userData.specialization.toUpperCase() }
+        });
+        specializationId = spec.id;
+      }
+
+      // 3. Crear usuario con relaciones
       const user = await prisma.user.create({
         data: {
           email: userData.email,
           fullname: userData.fullname,
           currentPassword: hashedPassword,
           role: userRole,
-          status: userData.status || 'PENDING'
+          status: userData.status || 'PENDING',
+          phone: userData.phone || null,
+          dateOfBirth: userData.date_of_birth ? new Date(userData.date_of_birth) : null,
+          licenseNumber: userData.license_number || null,
+          
+          departmentId,
+          specializationId
         }
       });
-
-      // LUEGO crear el medicalProfile usando SQL directo (evita error TypeScript)
-      if (userData.specialization || userData.department || userData.license_number || userData.phone || userData.date_of_birth) {
-        await prisma.$executeRaw`
-          INSERT INTO "MedicalProfile" 
-          ("userId", "specialization", "department", "licenseNumber", "phone", "dateOfBirth", "createdAt", "updatedAt")
-          VALUES (
-            ${user.id}, 
-            ${userData.specialization}, 
-            ${userData.department}, 
-            ${userData.license_number}, 
-            ${userData.phone}, 
-            ${userData.date_of_birth ? new Date(userData.date_of_birth) : null},
-            NOW(), 
-            NOW()
-          )
-        `;
-      }
 
       results.success++;
       results.details.push({
         email: userData.email,
         status: 'CREATED',
-        message: 'Usuario y perfil médico creados exitosamente'
+        message: 'Usuario creado exitosamente'
       });
 
     } catch (error: any) {
@@ -96,7 +105,7 @@ export const bulkCreateUsers = async (users: BulkUser[]) => {
       results.details.push({
         email: userData.email,
         status: 'ERROR',
-        message: error.message
+        message: error.message || 'Error desconocido'
       });
     }
   }

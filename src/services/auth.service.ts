@@ -27,7 +27,7 @@ export const registerUser = async (
       email,
       currentPassword: hashedPassword,
       fullname,
-      role: Role.PATIENT,
+      role: Role.PACIENTE,
       status: 'PENDING',              // estado inicial
       verificationCode: code,         // código de 6 dígitos
       verificationExpires: expiresAt, // fecha de expiración

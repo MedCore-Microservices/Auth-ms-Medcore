@@ -7,70 +7,82 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ========================
+// ENUMS
+// ========================
+
 enum Role {
-  ADMIN
-  DOCTOR
-  NURSE
-  PATIENT
+  ADMINISTRADOR
+  MEDICO
+  ENFERMERA
+  PACIENTE
 }
+
+// ========================
+// MODELS
+// ========================
 
 model User {
-  id                  Int       @id @default(autoincrement())
-  email               String    @unique
+  id                  Int            @id @default(autoincrement())
+  email               String         @unique
   fullname            String
-  status              String    @default("PENDING")
+  role                Role           @default(PACIENTE)
+  currentPassword     String
+  status              String         @default("PENDING") // PENDING, ACTIVE, INACTIVE
+  phone               String?
+  dateOfBirth         DateTime?
+  licenseNumber       String?        
+  emergencyContact    String?
+  bloodType           String?
+  allergies           String?
+  chronicDiseases     String?
   verificationCode    String?
   verificationExpires DateTime?
-  currentPassword     String
-  role                Role      @default(PATIENT) //Por defecto es paciente
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 
+  // Relaciones opcionales (solo para staff)
+  departmentId        Int?           // Todos los staff (MEDICO, ENFERMERA, ADMINISTRADOR)
+  department          Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
-  medicalProfile      MedicalProfile?
+  specializationId    Int?           // Solo para MEDICO
+  specialization      Specialization? @relation(fields: [specializationId], references: [id], onDelete: SetNull)
 
-  auditLogs AuditLog[]
+  // Relaciones
+  auditLogs           AuditLog[]
 }
 
-model MedicalProfile {
-  id              Int      @id @default(autoincrement())
-  userId          Int      @unique
-  specialization  String?  // Cardiología, Pediatría, etc.
-  department      String?  // Urgencias, Medicina Interna, etc.
-  licenseNumber   String?  // Número de licencia médica
-  phone           String?  // Teléfono de contacto
-  dateOfBirth     DateTime? // Fecha de nacimiento
-  address         String?  // Dirección
-  emergencyContact String? // Contacto de emergencia
-  bloodType       String?  // Tipo de sangre (A+, O-, etc.)
-  allergies       String?  // Alergias medicamentosas/alimenticias
-  chronicDiseases String?  // Enfermedades crónicas
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+model Department {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique // Ej: "URGENCIAS", "MEDICINA_INTERNA", "ADMINISTRACION"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  // Relación con User
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  users     User[]
 }
 
+model Specialization {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique // Ej: "CARDIOLOGIA", "PEDIATRIA"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-
-
-
-
+  users     User[]   // Solo médicos deberían tener esto (lógica en app)
+}
 
 model TokenBlacklist {
   id        Int      @id @default(autoincrement())
-  token     String   @unique // El token que ha sido revocado
-  expiresAt DateTime // Fecha de expiración original del token
+  token     String   @unique
+  expiresAt DateTime
   createdAt DateTime @default(now())
 }
 
 model AuditLog {
   id        Int      @id @default(autoincrement())
-  userId    Int? // Opcional, porque en register el user aún no existe
-  action    String // Ej: "USER_REGISTER", "USER_LOGIN", "USER_LOGOUT"
-  details   String? // JSON string con detalles adicionales
+  userId    Int?     // null en eventos como "USER_REGISTER"
+  action    String   // Ej: "USER_LOGIN", "USER_REGISTER", "PROFILE_UPDATE"
+  details   String?  // JSON serializado con metadata adicional
   timestamp DateTime @default(now())
 
-  user User? @relation(fields: [userId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 }
