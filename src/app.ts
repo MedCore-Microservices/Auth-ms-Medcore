@@ -3,7 +3,6 @@ import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/auth.routes';
 import dotenv from 'dotenv'; 
-import bulkUploadRoutes from './routes/bulk-upload.routes';
 import patientRoutes from './routes/patient.routes';
 
 dotenv.config();
@@ -22,7 +21,6 @@ app.use(express.json()); // Para parsear el body de las peticiones JSON
 
 // Rutas
 app.use('/api/auth', authRoutes);
-app.use('/api', bulkUploadRoutes);
 app.use('/api/patients', patientRoutes);
 
 // Ruta de prueba

@@ -9,6 +9,8 @@ import {
   updatePatient,
   updatePatientState
 } from '../controllers/patient.controller';
+import { bulkUploadUsers } from '../controllers/bulk-upload.controller';
+import { upload } from '../middleware/upload.middleware';
 
 const router = Router();
 
@@ -26,5 +28,14 @@ router.put('/:id', authenticateToken, canManagePatients, updatePatient);
 
 // PATCH /api/patients/state/:id → actualizar estado (ACTIVO/INACTIVO)
 router.patch('/state/:id', authenticateToken, canManagePatients, updatePatientState);
+
+// POST /bulk-import → cargue masivo (solo ADMINISTRADOR)
+router.post(
+  '/bulk-import',
+  authenticateToken,
+  authorizeRoles(Role.ADMINISTRADOR),
+  upload.single('file'),
+  bulkUploadUsers
+);
 
 export default router;
