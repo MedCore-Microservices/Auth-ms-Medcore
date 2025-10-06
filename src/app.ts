@@ -28,6 +28,14 @@ app.get('/', (req, res) => {
   res.send('¡Servicio de Autenticación de MedCore está funcionando!');
 });
 
-app.listen(PORT, () => {
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`✅ Servidor corriendo en http://localhost:${PORT}`);
+  });
+}
+
+/*app.listen(PORT, () => {
   console.log(`✅ Servidor corriendo en http://localhost:${PORT}`);
-});
+});*/
+
+export default app;
