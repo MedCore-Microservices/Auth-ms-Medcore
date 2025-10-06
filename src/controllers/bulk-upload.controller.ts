@@ -29,7 +29,8 @@ const parseFileToUsers = (buffer: Buffer, originalname: string): any[] => {
   const expectedHeaders = [
     'email', 'fullname', 'role', 'current_password',
     'status', 'specialization', 'department',
-    'license_number', 'phone', 'date_of_birth'
+    'license_number', 'phone', 'date_of_birth',
+    'identificationnumber'
   ];
 
   // Validar que los encabezados coincidan (ignorando mayúsculas/minúsculas y espacios)
@@ -54,8 +55,10 @@ const parseFileToUsers = (buffer: Buffer, originalname: string): any[] => {
       }
     });
 
+    console.log('Datos del usuario procesados:', user);
+
     // Validar campos obligatorios
-    if (!user.email || !user.fullname || !user.role || !user.current_password) {
+    if (!user.email || !user.fullname || !user.role || !user.current_password || user.identificationNumber) {
       throw new Error(`Fila ${i + 1}: faltan campos obligatorios (email, fullname, role, current_password)`);
     }
 

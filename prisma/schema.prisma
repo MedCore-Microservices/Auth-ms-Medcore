@@ -29,6 +29,7 @@ model User {
   role                Role           @default(PACIENTE)
   currentPassword     String
   status              String         @default("PENDING") // PENDING, ACTIVE, INACTIVE
+  identificationNumber String       @unique
   phone               String?
   dateOfBirth         DateTime?
   licenseNumber       String?        

@@ -8,6 +8,7 @@ interface BulkUser {
   fullname: string;
   role: string;
   current_password: string;
+  identificationnumber: string;
   status: string;
   specialization?: string;
   department?: string;
@@ -48,6 +49,19 @@ export const bulkCreateUsers = async (users: BulkUser[]) => {
         continue;
       }
 
+      const existingUserByIdentification = await prisma.user.findUnique({
+        where: { identificationNumber: userData.identificationnumber }
+      });
+
+      if (existingUserByIdentification) {
+        results.details.push({
+          email: userData.email,
+          status: 'SKIPPED',
+          message: `El número de identificación ${userData.identificationnumber} ya está registrado`
+        });
+        continue;
+      }
+
       const hashedPassword = await bcrypt.hash(userData.current_password, 10);
 
       // Normalizar rol
@@ -75,6 +89,10 @@ export const bulkCreateUsers = async (users: BulkUser[]) => {
         specializationId = spec.id;
       }
 
+      console.log('Procesando usuario:', userData.email);
+      console.log('Número de identificación:', userData.identificationnumber);
+
+      const uniquePatientId = `PAT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       // 3. Crear usuario con relaciones
       const user = await prisma.user.create({
         data: {
@@ -86,7 +104,7 @@ export const bulkCreateUsers = async (users: BulkUser[]) => {
           phone: userData.phone || null,
           dateOfBirth: userData.date_of_birth ? new Date(userData.date_of_birth) : null,
           licenseNumber: userData.license_number || null,
-          
+          identificationNumber: userData.identificationnumber || null,
           departmentId,
           specializationId
         }
