@@ -1,21 +1,38 @@
-# Usa una imagen de Node.js
-FROM node:20-alpine
-
-# Directorio de trabajo
+# Dockerfile
+# ---------- STAGE: builder ----------
+FROM node:18-bullseye-slim AS builder
 WORKDIR /app
 
-# Copia package.json y package-lock.json
+# Copiamos package-lock y package.json para instalar
 COPY package*.json ./
 
-# Instala todas las dependencias (incluyendo devDependencies, necesarias para compilar TS)
+# Instala dependencias (dev+prod) para poder build + generar prisma client
 RUN npm ci
 
-# Copia todo el código fuente
+# Copiamos el resto
 COPY . .
-RUN npx prisma generate
 
-# Compila TypeScript → genera la carpeta dist/
+# Generar cliente Prisma y compilar (ajusta si no usas TS)
+RUN npx prisma generate || true
 RUN npm run build
 
-# Ejecuta la app compilada
-CMD ["node", "dist/app.js"]
+# ---------- STAGE: runner ----------
+FROM node:18-bullseye-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Copiamos solo lo necesario desde builder
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
+
+# Asegurar permisos de ejecución
+RUN chmod +x ./entrypoint.sh
+
+# Puerto recomendado (Render pondrá PORT env var)
+EXPOSE 3001
+
+# Arranque
+CMD ["./entrypoint.sh"]
