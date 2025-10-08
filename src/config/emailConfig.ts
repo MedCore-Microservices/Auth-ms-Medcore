@@ -14,14 +14,15 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-transporter.verify(function (error, success) {
-  if (error) {
-    console.log('❌ [EMAIL] Error conexión SMTP:', error);
-  } else {
-    console.log('✅ [EMAIL] Servidor SMTP listo para enviar');
-  }
-});
-
+if (process.env.NODE_ENV !== 'test') {
+  transporter.verify((error, success) => {
+    if (error) {
+      console.error(' [EMAIL] Error conexión SMTP:', error);
+    } else {
+      console.log(' [EMAIL] Servidor SMTP listo para enviar');
+    }
+  });
+}
 
 
 export const sendVerificationEmail = async (
