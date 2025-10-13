@@ -1,5 +1,6 @@
 import { PrismaClient, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { calculateAge } from '../utils/validation';
 
 const prisma = new PrismaClient();
 
@@ -103,6 +104,7 @@ export const bulkCreateUsers = async (users: BulkUser[]) => {
           status: userData.status || 'PENDING',
           phone: userData.phone || null,
           dateOfBirth: userData.date_of_birth ? new Date(userData.date_of_birth) : null,
+          age: userData.date_of_birth ? calculateAge(new Date(userData.date_of_birth)) : null,
           licenseNumber: userData.license_number || null,
           identificationNumber: userData.identificationnumber || null,
           departmentId,
