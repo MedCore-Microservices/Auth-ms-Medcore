@@ -5,6 +5,8 @@ import authRoutes from './routes/auth.routes';
 import dotenv from 'dotenv'; 
 import patientRoutes from './routes/patient.routes';
 import departmentRoutes from './routes/department.routes';
+import nurseRoutes from './routes/nurse.routes';
+import specializationRoutes from './routes/specialization.routes';
 
 dotenv.config();
 const app = express();
@@ -24,6 +26,8 @@ app.use(express.json()); // Para parsear el body de las peticiones JSON
 app.use('/api/auth', authRoutes);
 app.use('/api/patients', patientRoutes);
 app.use('/api/departments', departmentRoutes);
+app.use('/api/nurses', nurseRoutes);
+app.use('/api/specializations', specializationRoutes);
 
 // Ruta de prueba
 app.get('/', (req, res) => {
