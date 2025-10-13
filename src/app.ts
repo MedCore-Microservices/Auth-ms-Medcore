@@ -4,6 +4,7 @@ import cors from 'cors';
 import authRoutes from './routes/auth.routes';
 import dotenv from 'dotenv'; 
 import patientRoutes from './routes/patient.routes';
+import departmentRoutes from './routes/department.routes';
 
 dotenv.config();
 const app = express();
@@ -22,6 +23,7 @@ app.use(express.json()); // Para parsear el body de las peticiones JSON
 // Rutas
 app.use('/api/auth', authRoutes);
 app.use('/api/patients', patientRoutes);
+app.use('/api/departments', departmentRoutes);
 
 // Ruta de prueba
 app.get('/', (req, res) => {
