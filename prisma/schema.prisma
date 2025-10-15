@@ -51,7 +51,11 @@ model User {
   specialization   Specialization? @relation(fields: [specializationId], references: [id], onDelete: SetNull)
 
   // Relaciones
-  auditLogs AuditLog[]
+  auditLogs               AuditLog[]
+  appointmentsAsPatient   Appointment[]   @relation("UserAppointments") // Relación con citas como paciente
+  appointmentsAsDoctor    Appointment[]   @relation("DoctorAppointments") // Relación con citas como médico
+  medicalRecordsAsPatient MedicalRecord[] @relation("PatientMedicalRecords") // Relación con historias clínicas como paciente
+  medicalRecordsAsDoctor  MedicalRecord[] @relation("DoctorMedicalRecords") // Relación con historias clínicas como médico
 }
 
 model Department {
@@ -62,6 +66,7 @@ model Department {
 
   users           User[]
   specializations Specialization[]
+  medicalRecords  MedicalRecord[] // Relación con historias clínicas
 }
 
 model Specialization {
@@ -90,4 +95,47 @@ model AuditLog {
   timestamp DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model Appointment {
+  id              Int            @id @default(autoincrement())
+  userId          Int // Relación con el paciente
+  user            User           @relation("UserAppointments", fields: [userId], references: [id], onDelete: Cascade)
+  doctorId        Int? // Relación con el médico
+  doctor          User?          @relation("DoctorAppointments", fields: [doctorId], references: [id], onDelete: SetNull)
+  medicalRecordId Int? // Relación con la historia clínica (opcional)
+  medicalRecord   MedicalRecord? @relation(fields: [medicalRecordId], references: [id], onDelete: SetNull)
+  date            DateTime // Fecha y hora de la cita
+  reason          String // Motivo de la cita
+  status          String         @default("PENDING") // Estado de la cita: PENDING, COMPLETED, CANCELLED
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model MedicalRecord {
+  id              Int         @id @default(autoincrement())
+  userId          Int // Relación con el paciente
+  user            User        @relation("PatientMedicalRecords", fields: [userId], references: [id], onDelete: Cascade)
+  doctorId        Int? // Relación con el médico responsable
+  doctor          User?       @relation("DoctorMedicalRecords", fields: [doctorId], references: [id], onDelete: SetNull)
+  departmentId    Int? // Relación con el departamento o especialidad
+  department      Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  description     String // Motivo de consulta
+  diagnosis       String // Diagnóstico
+  treatment       String // Tratamiento
+  allergies       String? // Alergias conocidas
+  chronicDiseases String? // Enfermedades crónicas
+  vitalSigns      Json? // Signos vitales (JSON para flexibilidad)
+  labResults      Json? // Resultados de laboratorio (JSON para flexibilidad)
+  procedures      Json? // Procedimientos realizados (JSON para flexibilidad)
+  medicalOrders   Json? // Órdenes médicas (JSON para flexibilidad)
+  prescriptions   Json? // Prescripciones médicas (JSON para flexibilidad)
+  followUpNotes   String? // Notas de seguimiento
+  patientStatus   String? // Estado del paciente
+  adminNotes      String? // Notas administrativas
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relación con las citas
+  appointments Appointment[]
 }
