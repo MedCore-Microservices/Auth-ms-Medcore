@@ -1,5 +1,6 @@
 import { PrismaClient, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { calculateAge } from '../utils/validation';
 
 const prisma = new PrismaClient();
 
@@ -24,7 +25,6 @@ export const bulkCreateUsers = async (users: BulkUser[]) => {
     details: [] as any[]
   };
 
-  // Mapeo de roles del Excel al enum actualizado
   const roleMap: { [key: string]: Role } = {
     'MEDICO': Role.MEDICO,
     'ENFERMERA': Role.ENFERMERA,
@@ -32,42 +32,64 @@ export const bulkCreateUsers = async (users: BulkUser[]) => {
     'PACIENTE': Role.PACIENTE
   };
 
-  for (const userData of users) {
+  for (let i = 0; i < users.length; i++) {
+    const userData = users[i];
     try {
-      console.log('Procesando usuario:', userData.email);
+      console.log(`Procesando fila ${i + 1}:`, userData.email);
 
+      // Validar duplicados por email
       const existingUser = await prisma.user.findUnique({
         where: { email: userData.email }
       });
 
       if (existingUser) {
         results.details.push({
+          row: i + 1,
           email: userData.email,
-          status: 'SKIPPED',
-          message: 'Usuario ya existe'
+          status: 'ERROR',
+          message: `El correo '${userData.email}' ya existe.`
         });
+        results.errors++;
         continue;
       }
 
+      // Validar duplicados por identificación
       const existingUserByIdentification = await prisma.user.findUnique({
         where: { identificationNumber: userData.identificationnumber }
       });
 
       if (existingUserByIdentification) {
         results.details.push({
+          row: i + 1,
           email: userData.email,
-          status: 'SKIPPED',
-          message: `El número de identificación ${userData.identificationnumber} ya está registrado`
+          status: 'ERROR',
+          message: `El número de identificación '${userData.identificationnumber}' ya está registrado.`
         });
+        results.errors++;
         continue;
       }
 
-      const hashedPassword = await bcrypt.hash(userData.current_password, 10);
+      // Validar fecha de nacimiento
+      let dateOfBirth: Date | null = null;
+      if (userData.date_of_birth) {
+        const parsedDate = new Date(userData.date_of_birth);
+        if (isNaN(parsedDate.getTime())) {
+          results.details.push({
+            row: i + 1,
+            email: userData.email,
+            status: 'ERROR',
+            message: `La fecha de nacimiento '${userData.date_of_birth}' no es válida.`
+          });
+          results.errors++;
+          continue;
+        }
+        dateOfBirth = parsedDate;
+      }
 
-      // Normalizar rol
-      const userRole = roleMap[userData.role?.toUpperCase()] || Role.PACIENTE;
+      // Calcular edad
+      const age = dateOfBirth ? calculateAge(dateOfBirth) : null;
 
-      // 1. Manejar Department (solo si aplica)
+      // Manejar Department
       let departmentId: number | null = null;
       if (userData.department) {
         const dept = await prisma.department.upsert({
@@ -78,9 +100,9 @@ export const bulkCreateUsers = async (users: BulkUser[]) => {
         departmentId = dept.id;
       }
 
-      // 2. Manejar Specialization (solo para médicos)
+      // Manejar Specialization
       let specializationId: number | null = null;
-      if (userData.specialization && userRole === Role.MEDICO) {
+      if (userData.specialization && roleMap[userData.role?.toUpperCase()] === Role.MEDICO) {
         const spec = await prisma.specialization.upsert({
           where: { name: userData.specialization.toUpperCase() },
           update: {},
@@ -89,20 +111,18 @@ export const bulkCreateUsers = async (users: BulkUser[]) => {
         specializationId = spec.id;
       }
 
-      console.log('Procesando usuario:', userData.email);
-      console.log('Número de identificación:', userData.identificationnumber);
-
-      const uniquePatientId = `PAT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      // 3. Crear usuario con relaciones
-      const user = await prisma.user.create({
+      // Crear usuario
+      const hashedPassword = await bcrypt.hash(userData.current_password, 10);
+      await prisma.user.create({
         data: {
           email: userData.email,
           fullname: userData.fullname,
           currentPassword: hashedPassword,
-          role: userRole,
+          role: roleMap[userData.role?.toUpperCase()] || Role.PACIENTE,
           status: userData.status || 'PENDING',
           phone: userData.phone || null,
-          dateOfBirth: userData.date_of_birth ? new Date(userData.date_of_birth) : null,
+          dateOfBirth,
+          age,
           licenseNumber: userData.license_number || null,
           identificationNumber: userData.identificationnumber || null,
           departmentId,
@@ -112,18 +132,20 @@ export const bulkCreateUsers = async (users: BulkUser[]) => {
 
       results.success++;
       results.details.push({
+        row: i + 1,
         email: userData.email,
-        status: 'CREATED',
-        message: 'Usuario creado exitosamente'
+        status: 'SUCCESS',
+        message: 'Usuario creado exitosamente.'
       });
 
     } catch (error: any) {
-      console.error('Error creando usuario:', userData.email, error);
+      console.error(`Error en la fila ${i + 1}:`, error.message);
       results.errors++;
       results.details.push({
+        row: i + 1,
         email: userData.email,
         status: 'ERROR',
-        message: error.message || 'Error desconocido'
+        message: error.message || 'Error desconocido.'
       });
     }
   }

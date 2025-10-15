@@ -80,6 +80,11 @@ export const bulkUploadUsers = async (req: Request, res: Response) => {
 
     const result = await bulkCreateUsers(users);
 
+    console.log(`Proceso finalizado. Registros exitosos: ${result.success}, Registros fallidos: ${result.errors}`);
+    result.details.forEach((detail) => {
+      console.log(`Fila ${detail.row}: ${detail.message}`);
+    });
+
     await logAuditEvent('BULK_UPLOAD_USERS', {
       total: users.length,
       success: result.success,
@@ -90,8 +95,8 @@ export const bulkUploadUsers = async (req: Request, res: Response) => {
     });
 
     return res.status(200).json({
-      message: `Cargue masivo completado: ${result.success} exitosos, ${result.errors} errores`,
-      ...result
+      message: `Cargue masivo completado. Registros exitosos: ${result.success}, Registros fallidos: ${result.errors}`,
+      details: result.details
     });
 
   } catch (error: any) {
@@ -102,3 +107,37 @@ export const bulkUploadUsers = async (req: Request, res: Response) => {
     });
   }
 };
+// export const bulkUploadUsers = async (req: Request, res: Response) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({ message: 'Se requiere un archivo' });
+//     }
+
+//     const users = parseFileToUsers(req.file.buffer, req.file.originalname);
+
+//     console.log(`Procesando cargue masivo de ${users.length} usuarios desde archivo`);
+
+//     const result = await bulkCreateUsers(users);
+
+//     await logAuditEvent('BULK_UPLOAD_USERS', {
+//       total: users.length,
+//       success: result.success,
+//       errors: result.errors,
+//       ip: req.ip,
+//       userAgent: req.get('User-Agent'),
+//       filename: req.file.originalname
+//     });
+
+//     return res.status(200).json({
+//       message: `Cargue masivo completado: ${result.success} exitosos, ${result.errors} errores`,
+//       ...result
+//     });
+
+//   } catch (error: any) {
+//     console.error('Error en cargue masivo:', error);
+//     return res.status(400).json({
+//       message: 'Error al procesar el archivo',
+//       error: error.message
+//     });
+//   }
+// };
