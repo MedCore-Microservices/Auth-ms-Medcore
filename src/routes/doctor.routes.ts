@@ -8,13 +8,20 @@ import {
   updateDoctor,
   updateDoctorState,
   getSpecializations,
-  getDepartments
+  getDepartments,
+  createDoctor,
+  getDoctorsBySpecialty,
+  getUsersByRole
 } from '../controllers/doctor.controller';
 
 const router = Router();
 
 // Solo ADMINISTRADOR, MEDICO o ENFERMERA pueden gestionar médicos
 const canManageDoctors = authorizeRoles(Role.ADMINISTRADOR, Role.MEDICO, Role.ENFERMERA);
+const adminOnly = authorizeRoles(Role.ADMINISTRADOR);
+router.post('/', authenticateToken, adminOnly, createDoctor);
+router.get('/users/by-role', getUsersByRole);
+router.get('/users/by-specialty', getDoctorsBySpecialty);
 
 // Solo ADMINISTRADOR puede cambiar estados
 const canChangeState = authorizeRoles(Role.ADMINISTRADOR);

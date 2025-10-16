@@ -8,6 +8,8 @@ import departmentRoutes from './routes/department.routes';
 import nurseRoutes from './routes/nurse.routes';
 import specializationRoutes from './routes/specialization.routes';
 import doctorRoutes from './routes/doctor.routes';
+import userRoutes from './routes/user.routes';
+
 
 dotenv.config();
 const app = express();
@@ -30,6 +32,8 @@ app.use('/api/departments', departmentRoutes);
 app.use('/api/nurses', nurseRoutes);
 app.use('/api/specializations', specializationRoutes);
 app.use('/api/doctors', doctorRoutes);
+app.use('/api/users', userRoutes); 
+
 
 // Ruta de prueba
 app.get('/', (req, res) => {

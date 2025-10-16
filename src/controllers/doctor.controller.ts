@@ -388,3 +388,196 @@ export const getDepartments = async (req: Request, res: Response) => {
     return res.status(500).json({ message: 'Error al obtener los departamentos.' });
   }
 };
+
+// POST /api/users/doctors - Registrar doctor
+export const createDoctor = async (req: Request, res: Response) => {
+  try {
+    const {
+      email,
+      currentPassword,
+      fullname,
+      identificationNumber,
+      phone,
+      licenseNumber,
+      dateOfBirth,
+      departmentId,
+      specializationId
+    } = req.body;
+
+    // Validaciones básicas
+    if (!email || !currentPassword || !fullname || !identificationNumber || !dateOfBirth || !departmentId || !specializationId) {
+      return res.status(400).json({ message: 'Todos los campos obligatorios deben estar presentes.' });
+    }
+
+    // Validar email único
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return res.status(409).json({ message: 'El correo ya está registrado.' });
+    }
+
+    // Validar identificación única
+    const existingIdNumber = await prisma.user.findUnique({ where: { identificationNumber } });
+    if (existingIdNumber) {
+      return res.status(409).json({ message: 'El número de identificación ya está registrado.' });
+    }
+
+    // Validar nombre
+    const cleanName = sanitizeString(fullname);
+    if (!isValidName(cleanName)) {
+      return res.status(400).json({ message: 'Nombre inválido.' });
+    }
+
+    // Validar fecha de nacimiento y calcular edad
+    const birthDate = new Date(dateOfBirth);
+    if (isNaN(birthDate.getTime())) {
+      return res.status(400).json({ message: 'Fecha de nacimiento inválida.' });
+    }
+    const age = calculateAge(birthDate);
+    if (!isValidAge(age)) {
+      return res.status(400).json({ message: 'Edad fuera del rango permitido (0-100).' });
+    }
+
+    // Validar departamento
+    const department = await prisma.department.findUnique({ where: { id: departmentId } });
+    if (!department) {
+      return res.status(400).json({ message: 'Departamento no encontrado.' });
+    }
+
+    // Validar especialización
+    const specialization = await prisma.specialization.findUnique({ where: { id: specializationId } });
+    if (!specialization) {
+      return res.status(400).json({ message: 'Especialización no encontrada.' });
+    }
+
+    // Crear doctor
+    const doctor = await prisma.user.create({
+      data: {
+        email,
+        currentPassword, // ⚠️ En producción: hashear con bcrypt
+        fullname: cleanName,
+        identificationNumber,
+        phone: phone ? sanitizeString(phone) : null,
+        licenseNumber: licenseNumber ? sanitizeString(licenseNumber) : null,
+        dateOfBirth: birthDate,
+        age,
+        role: Role.MEDICO,
+        status: 'PENDING', // o 'ACTIVE' según política
+        departmentId,
+        specializationId
+      },
+      select: {
+        id: true,
+        email: true,
+        fullname: true,
+        identificationNumber: true,
+        phone: true,
+        licenseNumber: true,
+        status: true,
+        dateOfBirth: true,
+        age: true,
+        department: { select: { id: true, name: true } },
+        specialization: { select: { id: true, name: true } },
+        createdAt: true
+      }
+    });
+
+    await logAuditEvent('DOCTOR_CREATED', { doctorId: doctor.id }, (req as any).user?.userId);
+
+    return res.status(201).json({ message: 'Médico registrado exitosamente.', doctor });
+  } catch (error: any) {
+    console.error('Error registrando médico:', error);
+    return res.status(500).json({ message: 'Error al registrar el médico.' });
+  }
+};
+
+
+
+// GET /api/users/by-role?role=doctor
+export const getUsersByRole = async (req: Request, res: Response) => {
+  try {
+    const { role } = req.query;
+
+    if (role !== 'doctor') {
+      return res.status(400).json({ message: 'Solo se permite el rol "doctor" en este endpoint.' });
+    }
+
+    const users = await prisma.user.findMany({
+      where: { role: Role.MEDICO },
+      select: {
+        id: true,
+        email: true,
+        fullname: true,
+        identificationNumber: true,
+        phone: true,
+        status: true,
+        licenseNumber: true,
+        dateOfBirth: true,
+        age: true,
+        createdAt: true,
+        department: { select: { id: true, name: true } },
+        specialization: { select: { id: true, name: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return res.status(200).json({ users });
+  } catch (error: any) {
+    console.error('Error al filtrar usuarios por rol:', error);
+    return res.status(500).json({ message: 'Error al obtener usuarios por rol.' });
+  }
+};
+
+
+// GET /api/users/by-specialty?specialty=cardiologia - Filtrar doctores por especialidad
+export const getDoctorsBySpecialty = async (req: Request, res: Response) => {
+  try {
+    const { specialty } = req.query;
+
+    if (!specialty || typeof specialty !== 'string') {
+      return res.status(400).json({ message: 'El parámetro "specialty" es obligatorio y debe ser una cadena de texto.' });
+    }
+
+    const doctors = await prisma.user.findMany({
+      where: {
+        role: Role.MEDICO,
+        specialization: {
+          name: {
+            contains: specialty,
+            mode: 'insensitive'
+          }
+        }
+      },
+      select: {
+        id: true,
+        email: true,
+        fullname: true,
+        identificationNumber: true,
+        phone: true,
+        status: true,
+        licenseNumber: true,
+        dateOfBirth: true,
+        age: true,
+        createdAt: true,
+        updatedAt: true,
+        department: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        specialization: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: { fullname: 'asc' }
+    });
+
+    return res.status(200).json({ doctors });
+  } catch (error: any) {
+    console.error('Error al filtrar médicos por especialidad:', error);
+    return res.status(500).json({ message: 'Error al obtener los médicos por especialidad.' });
+  }
+};
