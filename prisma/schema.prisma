@@ -56,8 +56,12 @@ model User {
   appointmentsAsDoctor    Appointment[]   @relation("DoctorAppointments") // Relación con citas como médico
   medicalRecordsAsPatient MedicalRecord[] @relation("PatientMedicalRecords") // Relación con historias clínicas como paciente
   medicalRecordsAsDoctor  MedicalRecord[] @relation("DoctorMedicalRecords") // Relación con historias clínicas como médico
+
+  diagnosticsAsPatient Diagnostic[] @relation("PatientDiagnostics")
+  diagnosticsAsDoctor  Diagnostic[] @relation("DoctorDiagnostics")
 }
 
+// AGREGAR ESTAS DOS NUEVAS RELACIONES para Diagnostic
 model Department {
   id        Int      @id @default(autoincrement())
   name      String   @unique // Ej: "URGENCIAS", "MEDICINA_INTERNA", "ADMINISTRACION"
@@ -138,4 +142,43 @@ model MedicalRecord {
 
   // Relación con las citas
   appointments Appointment[]
+}
+
+// ========================
+// NUEVOS MODELOS PARA DIAGNÓSTICOS (VERSIÓN CORREGIDA)
+// ========================
+
+model Diagnostic {
+  id              Int       @id @default(autoincrement())
+  patientId       Int
+  patient         User      @relation("PatientDiagnostics", fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId        Int
+  doctor          User      @relation("DoctorDiagnostics", fields: [doctorId], references: [id], onDelete: Cascade)
+  title           String
+  description     String
+  symptoms        String
+  diagnosis       String
+  treatment       String
+  observations    String?
+  nextAppointment DateTime?
+  state           String    @default("ACTIVE")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  documents DiagnosticDocument[]
+}
+
+model DiagnosticDocument {
+  id             Int        @id @default(autoincrement())
+  diagnosticId   Int
+  diagnostic     Diagnostic @relation(fields: [diagnosticId], references: [id], onDelete: Cascade)
+  filename       String
+  storedFilename String
+  filePath       String
+  fileType       String
+  mimeType       String
+  fileSize       Int
+  description    String?
+  uploadedBy     Int
+  uploadedAt     DateTime   @default(now())
 }
