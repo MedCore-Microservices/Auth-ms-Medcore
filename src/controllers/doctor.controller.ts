@@ -581,3 +581,194 @@ export const getDoctorsBySpecialty = async (req: Request, res: Response) => {
     return res.status(500).json({ message: 'Error al obtener los médicos por especialidad.' });
   }
 };
+
+// GET /api/users - Filtros avanzados con query params (unificado)
+export const getUsersWithFilters = async (req: Request, res: Response) => {
+  try {
+    // Parámetros de paginación
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+
+    // Parámetros de filtro
+    const { role, specialty, state, department, search } = req.query;
+
+    // Construir el objeto WHERE para Prisma
+    const where: any = {};
+
+    // Filtro por rol
+    if (role) {
+      const roles = (role as string).split('|').map(r => r.trim().toUpperCase());
+      const validRoles = roles.filter(r => Object.values(Role).includes(r as Role));
+      
+      if (validRoles.length > 0) {
+        where.role = { in: validRoles };
+      }
+    }
+
+    // Filtro por estado
+    if (state) {
+      const states = (state as string).split('|').map(s => s.trim().toUpperCase());
+      const validStates = states.filter(s => ['ACTIVE', 'INACTIVE', 'PENDING'].includes(s));
+      
+      if (validStates.length > 0) {
+        where.status = { in: validStates };
+      }
+    }
+
+    // Filtro por departamento
+    if (department) {
+      const departments = (department as string).split('|').map(d => parseInt(d.trim()));
+      const validDepartments = departments.filter(d => !isNaN(d));
+      
+      if (validDepartments.length > 0) {
+        where.departmentId = { in: validDepartments };
+      }
+    }
+
+    // Filtro por especialidad (solo aplica a médicos)
+    if (specialty) {
+      const specialties = (specialty as string).split('|').map(s => parseInt(s.trim()));
+      const validSpecialties = specialties.filter(s => !isNaN(s));
+      
+      if (validSpecialties.length > 0) {
+        where.specializationId = { in: validSpecialties };
+        
+        // Asegurar que solo se aplique a médicos
+        if (!where.role) {
+          where.role = Role.MEDICO;
+        } else if (Array.isArray(where.role.in)) {
+          if (!where.role.in.includes(Role.MEDICO)) {
+            where.role.in.push(Role.MEDICO);
+          }
+        }
+      }
+    }
+
+    // Búsqueda por texto (nombre, email, identificación)
+    if (search) {
+      const searchTerm = `%${search}%`;
+      where.OR = [
+        { fullname: { contains: search as string, mode: 'insensitive' } },
+        { email: { contains: search as string, mode: 'insensitive' } },
+        { identificationNumber: { contains: search as string, mode: 'insensitive' } },
+        { licenseNumber: { contains: search as string, mode: 'insensitive' } }
+      ];
+    }
+
+    // Consulta principal con los filtros
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          email: true,
+          fullname: true,
+          identificationNumber: true,
+          phone: true,
+          status: true,
+          licenseNumber: true,
+          dateOfBirth: true,
+          age: true,
+          role: true,
+          emergencyContact: true,
+          bloodType: true,
+          allergies: true,
+          chronicDiseases: true,
+          createdAt: true,
+          updatedAt: true,
+          department: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          specialization: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.user.count({ where })
+    ]);
+
+    return res.status(200).json({
+      users,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1
+      }
+    });
+  } catch (error: any) {
+    console.error('Error en filtros avanzados:', error);
+    return res.status(500).json({ 
+      message: 'Error al obtener usuarios con filtros.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// GET /api/users/filters/metadata - Metadatos para los filtros
+export const getFiltersMetadata = async (req: Request, res: Response) => {
+  try {
+    const [departments, specializations, roleCounts, statusCounts] = await Promise.all([
+      prisma.department.findMany({
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' }
+      }),
+      prisma.specialization.findMany({
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' }
+      }),
+      prisma.user.groupBy({
+        by: ['role'],
+        _count: {
+          id: true
+        }
+      }),
+      prisma.user.groupBy({
+        by: ['status'],
+        _count: {
+          id: true
+        }
+      })
+    ]);
+
+    return res.status(200).json({
+      filters: {
+        roles: Object.values(Role).map(role => ({
+          value: role,
+          label: role.toLowerCase(),
+          count: roleCounts.find(r => r.role === role)?._count.id || 0
+        })),
+        statuses: ['ACTIVE', 'INACTIVE', 'PENDING'].map(status => ({
+          value: status,
+          label: status.toLowerCase(),
+          count: statusCounts.find(s => s.status === status)?._count.id || 0
+        })),
+        departments: departments.map(dept => ({
+          value: dept.id,
+          label: dept.name
+        })),
+        specializations: specializations.map(spec => ({
+          value: spec.id,
+          label: spec.name
+        }))
+      }
+    });
+  } catch (error: any) {
+    console.error('Error obteniendo metadatos de filtros:', error);
+    return res.status(500).json({ 
+      message: 'Error al obtener metadatos de filtros.' 
+    });
+  }
+};
