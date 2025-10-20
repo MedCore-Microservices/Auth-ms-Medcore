@@ -2,7 +2,9 @@ import { Request, Response } from 'express';
 import { PrismaClient, Role } from '@prisma/client';
 import {
   sanitizeString,
-  isValidName
+  isValidName,
+  calculateAge,
+  isValidAge
 } from '../utils/validation';
 import { logAuditEvent } from '../services/audit.service';
 
@@ -288,5 +290,97 @@ export const updateNurseState = async (req: Request, res: Response) => {
     }
     console.error('Error actualizando estado:', error);
     return res.status(500).json({ message: 'Error al actualizar el estado de la enfermera.' });
+  }
+};
+
+// POST /api/users/nurses - Registrar enfermera
+export const createNurse = async (req: Request, res: Response) => {
+  try {
+    const {
+      email,
+      currentPassword,
+      fullname,
+      identificationNumber,
+      phone,
+      licenseNumber,
+      dateOfBirth,
+      departmentId
+    } = req.body;
+
+    // Validaciones básicas
+    if (!email || !currentPassword || !fullname || !identificationNumber || !dateOfBirth || !departmentId) {
+      return res.status(400).json({ message: 'Todos los campos obligatorios deben estar presentes.' });
+    }
+
+    // Validar email único
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return res.status(409).json({ message: 'El correo ya está registrado.' });
+    }
+
+    // Validar identificación única
+    const existingIdNumber = await prisma.user.findUnique({ where: { identificationNumber } });
+    if (existingIdNumber) {
+      return res.status(409).json({ message: 'El número de identificación ya está registrado.' });
+    }
+
+    // Validar nombre
+    const cleanName = sanitizeString(fullname);
+    if (!isValidName(cleanName)) {
+      return res.status(400).json({ message: 'Nombre inválido.' });
+    }
+
+    // Validar fecha de nacimiento y calcular edad
+    const birthDate = new Date(dateOfBirth);
+    if (isNaN(birthDate.getTime())) {
+      return res.status(400).json({ message: 'Fecha de nacimiento inválida.' });
+    }
+    const age = calculateAge(birthDate);
+    if (!isValidAge(age)) {
+      return res.status(400).json({ message: 'Edad fuera del rango permitido (0-100).' });
+    }
+
+    // Validar departamento
+    const department = await prisma.department.findUnique({ where: { id: departmentId } });
+    if (!department) {
+      return res.status(400).json({ message: 'Departamento no encontrado.' });
+    }
+
+    // Crear enfermera
+    const nurse = await prisma.user.create({
+      data: {
+        email,
+        currentPassword, // ⚠️ En producción: hashear con bcrypt
+        fullname: cleanName,
+        identificationNumber,
+        phone: phone ? sanitizeString(phone) : null,
+        licenseNumber: licenseNumber ? sanitizeString(licenseNumber) : null,
+        dateOfBirth: birthDate,
+        age,
+        role: Role.ENFERMERA,
+        status: 'PENDING',
+        departmentId
+      },
+      select: {
+        id: true,
+        email: true,
+        fullname: true,
+        identificationNumber: true,
+        phone: true,
+        licenseNumber: true,
+        status: true,
+        dateOfBirth: true,
+        age: true,
+        department: { select: { id: true, name: true } },
+        createdAt: true
+      }
+    });
+
+    await logAuditEvent('NURSE_CREATED', { nurseId: nurse.id }, (req as any).user?.userId);
+
+    return res.status(201).json({ message: 'Enfermera registrada exitosamente.', nurse });
+  } catch (error: any) {
+    console.error('Error registrando enfermera:', error);
+    return res.status(500).json({ message: 'Error al registrar la enfermera.' });
   }
 };
