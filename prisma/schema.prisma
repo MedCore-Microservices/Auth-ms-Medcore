@@ -32,6 +32,7 @@ model User {
   identificationNumber String?   @unique
   phone                String?
   dateOfBirth          DateTime?
+  gender               String?
   age                  Int?
   licenseNumber        String?
   emergencyContact     String?

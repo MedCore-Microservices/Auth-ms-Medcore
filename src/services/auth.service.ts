@@ -8,16 +8,22 @@ import { sendVerificationEmail } from '../config/emailConfig';
 const prisma = new PrismaClient();
 
 console.log("🛠️ Prisma Client Path:", require.resolve("@prisma/client"));
+export type RegisterPayload = {
+  email: string;
+  password: string;
+  fullname: string;
+  identificationNumber?: string;
+  dateOfBirth?: string; // ISO string expected from client
+  gender?: string;
+  phone?: string;
+};
+export const registerUser = async (payload: RegisterPayload) => {
+  const { email, password, fullname, identificationNumber, dateOfBirth, gender, phone } = payload;
 
-export const registerUser = async (
-  email: string,
-  password: string,
-  fullname: string
-) => {
   console.log("📥 Validando usuario existente con email:", email);
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
-    console.error("⚠️ Usuario ya registrado:", existingUser);
+    console.error("⚠️ Usuario ya registrado:", existingUser.email);
     throw new Error('El correo electrónico ya está registrado.');
   }
 
@@ -28,26 +34,36 @@ export const registerUser = async (
   const code = generateVerificationCode();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos
 
+  // Parse safe dateOfBirth -> Date | null
+  const dob: Date | null = dateOfBirth ? (isNaN(Date.parse(dateOfBirth)) ? null : new Date(dateOfBirth)) : null;
+
   console.log("🗂️ Creando usuario en la base de datos:", { email, fullname });
   const newUser = await prisma.user.create({
     data: {
-      email: email,
+      email,
       currentPassword: hashedPassword,
-      fullname: fullname,
+      fullname,
       role: Role.PACIENTE,
       status: 'PENDING',
       verificationCode: code,
       verificationExpires: expiresAt,
+
+      // Campos adicionales
+      identificationNumber: identificationNumber ?? undefined,
+      dateOfBirth: dob ?? undefined,
+      gender: gender ?? undefined,
+      phone: phone ?? undefined,
     }
   });
 
-  console.log("📤 Usuario creado exitosamente:", newUser);
+  console.log("📤 Usuario creado exitosamente:", newUser.email);
 
   try {
     console.log("📨 Enviando correo de verificación a:", email);
     await sendVerificationEmail(email, fullname, code);
   } catch (error) {
     console.error("⚠️ Error al enviar el correo de verificación:", error);
+    // No revertimos la creación; el usuario ya fue creado. Alternativa: marcar para reintento.
   }
 
   return newUser;

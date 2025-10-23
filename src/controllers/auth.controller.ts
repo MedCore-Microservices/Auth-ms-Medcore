@@ -22,7 +22,15 @@ declare global {
  */
 export const register = async (req: Request, res: Response) => {
   try {
-    const { email, password, fullname } = req.body;
+    const {
+      email,
+      password,
+      fullname,
+      identificationNumber,
+      dateOfBirth,
+      gender,
+      phone
+    } = req.body;
 
     if (!email || !password || !fullname) {
       return res.status(400).json({
@@ -30,8 +38,18 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    // El rol se establece automáticamente como PATIENT en el servicio
-    const newUser = await registerService(email, password, fullname);
+    // Construir payload y pasarlo al servicio
+    const payload = {
+      email,
+      password,
+      fullname,
+      identificationNumber,
+      dateOfBirth,
+      gender,
+      phone
+    };
+
+    const newUser = await registerService(payload);
 
     await logAuditEvent('USER_REGISTER', {
       email: newUser.email,
@@ -46,6 +64,10 @@ export const register = async (req: Request, res: Response) => {
         id: newUser.id,
         email: newUser.email,
         fullname: newUser.fullname,
+        identificationNumber: newUser.identificationNumber ?? null,
+        dateOfBirth: newUser.dateOfBirth ?? null,
+        gender: newUser.gender ?? null,
+        phone: newUser.phone ?? null,
         role: newUser.role,
         createdAt: newUser.createdAt
       }
