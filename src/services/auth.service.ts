@@ -7,39 +7,47 @@ import { generateVerificationCode } from '../utils/generateCode';
 import { sendVerificationEmail } from '../config/emailConfig';
 const prisma = new PrismaClient();
 
+console.log("🛠️ Prisma Client Path:", require.resolve("@prisma/client"));
+
 export const registerUser = async (
   email: string,
   password: string,
   fullname: string
 ) => {
+  console.log("📥 Validando usuario existente con email:", email);
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
+    console.error("⚠️ Usuario ya registrado:", existingUser);
     throw new Error('El correo electrónico ya está registrado.');
   }
 
+  console.log("🔒 Hasheando contraseña para el usuario:", email);
   const hashedPassword = await bcrypt.hash(password, 10);
-  const code = generateVerificationCode(); // ✅ Genera el código
+
+  console.log("📧 Generando código de verificación para:", email);
+  const code = generateVerificationCode();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos
 
-  //
+  console.log("🗂️ Creando usuario en la base de datos:", { email, fullname });
   const newUser = await prisma.user.create({
     data: {
-      email,
+      email: email,
       currentPassword: hashedPassword,
-      fullname,
+      fullname: fullname,
       role: Role.PACIENTE,
-      status: 'PENDING',              // estado inicial
-      verificationCode: code,         // código de 6 dígitos
-      verificationExpires: expiresAt, // fecha de expiración
+      status: 'PENDING',
+      verificationCode: code,
+      verificationExpires: expiresAt,
     }
   });
 
-  // ✅ Envía el código por correo
+  console.log("📤 Usuario creado exitosamente:", newUser);
+
   try {
-    await sendVerificationEmail(email, fullname, code); // 👈 pasa el código
+    console.log("📨 Enviando correo de verificación a:", email);
+    await sendVerificationEmail(email, fullname, code);
   } catch (error) {
-    console.error('⚠️ No se pudo enviar el código de verificación:', error);
-    // Opcional: eliminar usuario si falla el correo
+    console.error("⚠️ Error al enviar el correo de verificación:", error);
   }
 
   return newUser;
