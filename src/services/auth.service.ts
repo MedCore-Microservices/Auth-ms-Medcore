@@ -3,6 +3,7 @@ import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
 
 import { generateVerificationCode } from '../utils/generateCode'; 
+import { calculateAge, isValidAge } from '../utils/validation';
 
 import { sendVerificationEmail } from '../config/emailConfig';
 const prisma = new PrismaClient();
@@ -36,6 +37,20 @@ export const registerUser = async (payload: RegisterPayload) => {
 
   // Parse safe dateOfBirth -> Date | null
   const dob: Date | null = dateOfBirth ? (isNaN(Date.parse(dateOfBirth)) ? null : new Date(dateOfBirth)) : null;
+  // Calculate age if dob provided and valid
+  const computedAge: number | null = dob ? calculateAge(dob) : null;
+  const ageToPersist: number | undefined = computedAge !== null && isValidAge(computedAge) ? computedAge : undefined;
+
+  if (process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.log('[registerUser] parsed fields:', {
+      identificationNumber,
+      dateOfBirth,
+      dob: dob ? dob.toISOString() : null,
+      gender,
+      phone
+    });
+  }
 
   console.log("🗂️ Creando usuario en la base de datos:", { email, fullname });
   const newUser = await prisma.user.create({
@@ -51,6 +66,7 @@ export const registerUser = async (payload: RegisterPayload) => {
       // Campos adicionales
       identificationNumber: identificationNumber ?? undefined,
       dateOfBirth: dob ?? undefined,
+      age: ageToPersist,
       gender: gender ?? undefined,
       phone: phone ?? undefined,
     }
@@ -91,13 +107,13 @@ export const loginUser = async (email: string, password: string) => {
   const accessToken = jwt.sign(
     { userId: user.id, email: user.email, role: user.role },
     process.env.JWT_SECRET!,
-    { expiresIn: '15m' }
+    { expiresIn: '3h' } // Cambiado de '15m' a '3h'
   );
 
   const refreshToken = jwt.sign(
     { userId: user.id },
     process.env.JWT_REFRESH_SECRET!,
-    { expiresIn: '7d' }
+    { expiresIn: '3h' } // Cambiado de '7d' a '3h'
   );
 
   return {
