@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.bulkCreateUsers = void 0;
 const client_1 = require("@prisma/client");
 const bcrypt = __importStar(require("bcrypt"));
+const validation_1 = require("../utils/validation");
 const prisma = new client_1.PrismaClient();
 const bulkCreateUsers = async (users) => {
     const results = {
@@ -43,42 +44,63 @@ const bulkCreateUsers = async (users) => {
         errors: 0,
         details: []
     };
-    // Mapeo de roles del Excel al enum actualizado
     const roleMap = {
         'MEDICO': client_1.Role.MEDICO,
         'ENFERMERA': client_1.Role.ENFERMERA,
         'ADMINISTRADOR': client_1.Role.ADMINISTRADOR,
         'PACIENTE': client_1.Role.PACIENTE
     };
-    for (const userData of users) {
+    for (let i = 0; i < users.length; i++) {
+        const userData = users[i];
         try {
-            console.log('Procesando usuario:', userData.email);
+            console.log(`Procesando fila ${i + 1}:`, userData.email);
+            // Validar duplicados por email
             const existingUser = await prisma.user.findUnique({
                 where: { email: userData.email }
             });
             if (existingUser) {
                 results.details.push({
+                    row: i + 1,
                     email: userData.email,
-                    status: 'SKIPPED',
-                    message: 'Usuario ya existe'
+                    status: 'ERROR',
+                    message: `El correo '${userData.email}' ya existe.`
                 });
+                results.errors++;
                 continue;
             }
+            // Validar duplicados por identificación
             const existingUserByIdentification = await prisma.user.findUnique({
                 where: { identificationNumber: userData.identificationnumber }
             });
             if (existingUserByIdentification) {
                 results.details.push({
+                    row: i + 1,
                     email: userData.email,
-                    status: 'SKIPPED',
-                    message: `El número de identificación ${userData.identificationnumber} ya está registrado`
+                    status: 'ERROR',
+                    message: `El número de identificación '${userData.identificationnumber}' ya está registrado.`
                 });
+                results.errors++;
                 continue;
             }
-            const hashedPassword = await bcrypt.hash(userData.current_password, 10);
-            // Normalizar rol
-            const userRole = roleMap[userData.role?.toUpperCase()] || client_1.Role.PACIENTE;
-            // 1. Manejar Department (solo si aplica)
+            // Validar fecha de nacimiento
+            let dateOfBirth = null;
+            if (userData.date_of_birth) {
+                const parsedDate = new Date(userData.date_of_birth);
+                if (isNaN(parsedDate.getTime())) {
+                    results.details.push({
+                        row: i + 1,
+                        email: userData.email,
+                        status: 'ERROR',
+                        message: `La fecha de nacimiento '${userData.date_of_birth}' no es válida.`
+                    });
+                    results.errors++;
+                    continue;
+                }
+                dateOfBirth = parsedDate;
+            }
+            // Calcular edad
+            const age = dateOfBirth ? (0, validation_1.calculateAge)(dateOfBirth) : null;
+            // Manejar Department
             let departmentId = null;
             if (userData.department) {
                 const dept = await prisma.department.upsert({
@@ -88,9 +110,9 @@ const bulkCreateUsers = async (users) => {
                 });
                 departmentId = dept.id;
             }
-            // 2. Manejar Specialization (solo para médicos)
+            // Manejar Specialization
             let specializationId = null;
-            if (userData.specialization && userRole === client_1.Role.MEDICO) {
+            if (userData.specialization && roleMap[userData.role?.toUpperCase()] === client_1.Role.MEDICO) {
                 const spec = await prisma.specialization.upsert({
                     where: { name: userData.specialization.toUpperCase() },
                     update: {},
@@ -98,19 +120,18 @@ const bulkCreateUsers = async (users) => {
                 });
                 specializationId = spec.id;
             }
-            console.log('Procesando usuario:', userData.email);
-            console.log('Número de identificación:', userData.identificationnumber);
-            const uniquePatientId = `PAT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-            // 3. Crear usuario con relaciones
-            const user = await prisma.user.create({
+            // Crear usuario
+            const hashedPassword = await bcrypt.hash(userData.current_password, 10);
+            await prisma.user.create({
                 data: {
                     email: userData.email,
                     fullname: userData.fullname,
                     currentPassword: hashedPassword,
-                    role: userRole,
+                    role: roleMap[userData.role?.toUpperCase()] || client_1.Role.PACIENTE,
                     status: userData.status || 'PENDING',
                     phone: userData.phone || null,
-                    dateOfBirth: userData.date_of_birth ? new Date(userData.date_of_birth) : null,
+                    dateOfBirth,
+                    age,
                     licenseNumber: userData.license_number || null,
                     identificationNumber: userData.identificationnumber || null,
                     departmentId,
@@ -119,18 +140,20 @@ const bulkCreateUsers = async (users) => {
             });
             results.success++;
             results.details.push({
+                row: i + 1,
                 email: userData.email,
-                status: 'CREATED',
-                message: 'Usuario creado exitosamente'
+                status: 'SUCCESS',
+                message: 'Usuario creado exitosamente.'
             });
         }
         catch (error) {
-            console.error('Error creando usuario:', userData.email, error);
+            console.error(`Error en la fila ${i + 1}:`, error.message);
             results.errors++;
             results.details.push({
+                row: i + 1,
                 email: userData.email,
                 status: 'ERROR',
-                message: error.message || 'Error desconocido'
+                message: error.message || 'Error desconocido.'
             });
         }
     }

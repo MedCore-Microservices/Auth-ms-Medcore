@@ -60,6 +60,9 @@ model User {
 
   diagnosticsAsPatient Diagnostic[] @relation("PatientDiagnostics")
   diagnosticsAsDoctor  Diagnostic[] @relation("DoctorDiagnostics")
+
+  // Horarios como médico
+  scheduleSlots ScheduleSlot[]
 }
 
 // AGREGAR ESTAS DOS NUEVAS RELACIONES para Diagnostic
@@ -185,4 +188,25 @@ model DiagnosticDocument {
   description    String?
   uploadedBy     Int
   uploadedAt     DateTime   @default(now())
+}
+
+// ========================
+// SCHEDULE MODELS
+// ========================
+
+/// Representa un bloque de horario de 30 minutos (por defecto) para un médico.
+model ScheduleSlot {
+  id          Int      @id @default(autoincrement())
+  doctorId    Int
+  doctor      User     @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  start       DateTime
+  end         DateTime
+  /// AVAILABLE | BLOCKED | BOOKED (BOOKED se determina al sincronizar con citas o manualmente)
+  status      String   @default("AVAILABLE")
+  blockReason String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([doctorId, start, end])
+  @@unique([doctorId, start, end])
 }
