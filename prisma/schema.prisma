@@ -18,6 +18,14 @@ enum Role {
   PACIENTE
 }
 
+// Estado del turno en la cola
+enum QueueStatus {
+  WAITING
+  CALLED
+  COMPLETED
+  CANCELLED
+}
+
 // ========================
 // MODELS
 // ========================
@@ -63,6 +71,10 @@ model User {
 
   // Horarios como médico
   scheduleSlots ScheduleSlot[]
+
+  // Cola de turnos (como médico y como paciente)
+  queueTicketsAsDoctor  QueueTicket[] @relation("QueueTicketDoctor")
+  queueTicketsAsPatient QueueTicket[] @relation("QueueTicketPatient")
 }
 
 // AGREGAR ESTAS DOS NUEVAS RELACIONES para Diagnostic
@@ -209,4 +221,26 @@ model ScheduleSlot {
 
   @@index([doctorId, start, end])
   @@unique([doctorId, start, end])
+}
+
+// ========================
+// QUEUE MANAGEMENT MODELS
+// ========================
+
+/// Ticket de turno por médico (cola FIFO por doctor)
+model QueueTicket {
+  id          Int          @id @default(autoincrement())
+  doctorId    Int
+  patientId   Int
+  status      QueueStatus  @default(WAITING)
+  createdAt   DateTime     @default(now())
+  calledAt    DateTime?
+  completedAt DateTime?
+  updatedAt   DateTime     @updatedAt
+
+  doctor  User @relation("QueueTicketDoctor", fields: [doctorId], references: [id], onDelete: Cascade)
+  patient User @relation("QueueTicketPatient", fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId, status, createdAt])
+  @@index([patientId, status])
 }
