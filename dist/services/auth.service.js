@@ -38,35 +38,64 @@ const client_1 = require("@prisma/client");
 const bcrypt = __importStar(require("bcrypt"));
 const jwt = __importStar(require("jsonwebtoken"));
 const generateCode_1 = require("../utils/generateCode");
+const validation_1 = require("../utils/validation");
 const emailConfig_1 = require("../config/emailConfig");
 const prisma = new client_1.PrismaClient();
-const registerUser = async (email, password, fullname) => {
+console.log("🛠️ Prisma Client Path:", require.resolve("@prisma/client"));
+const registerUser = async (payload) => {
+    const { email, password, fullname, identificationNumber, dateOfBirth, gender, phone } = payload;
+    console.log("📥 Validando usuario existente con email:", email);
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
+        console.error("⚠️ Usuario ya registrado:", existingUser.email);
         throw new Error('El correo electrónico ya está registrado.');
     }
+    console.log("🔒 Hasheando contraseña para el usuario:", email);
     const hashedPassword = await bcrypt.hash(password, 10);
-    const code = (0, generateCode_1.generateVerificationCode)(); // ✅ Genera el código
+    console.log("📧 Generando código de verificación para:", email);
+    const code = (0, generateCode_1.generateVerificationCode)();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos
-    //
+    // Parse safe dateOfBirth -> Date | null
+    const dob = dateOfBirth ? (isNaN(Date.parse(dateOfBirth)) ? null : new Date(dateOfBirth)) : null;
+    // Calculate age if dob provided and valid
+    const computedAge = dob ? (0, validation_1.calculateAge)(dob) : null;
+    const ageToPersist = computedAge !== null && (0, validation_1.isValidAge)(computedAge) ? computedAge : undefined;
+    if (process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.log('[registerUser] parsed fields:', {
+            identificationNumber,
+            dateOfBirth,
+            dob: dob ? dob.toISOString() : null,
+            gender,
+            phone
+        });
+    }
+    console.log("🗂️ Creando usuario en la base de datos:", { email, fullname });
     const newUser = await prisma.user.create({
         data: {
             email,
             currentPassword: hashedPassword,
             fullname,
             role: client_1.Role.PACIENTE,
-            status: 'PENDING', // estado inicial
-            verificationCode: code, // código de 6 dígitos
-            verificationExpires: expiresAt, // fecha de expiración
+            status: 'PENDING',
+            verificationCode: code,
+            verificationExpires: expiresAt,
+            // Campos adicionales
+            identificationNumber: identificationNumber ?? undefined,
+            dateOfBirth: dob ?? undefined,
+            age: ageToPersist,
+            gender: gender ?? undefined,
+            phone: phone ?? undefined,
         }
     });
-    // ✅ Envía el código por correo
+    console.log("📤 Usuario creado exitosamente:", newUser.email);
     try {
-        await (0, emailConfig_1.sendVerificationEmail)(email, fullname, code); // 👈 pasa el código
+        console.log("📨 Enviando correo de verificación a:", email);
+        await (0, emailConfig_1.sendVerificationEmail)(email, fullname, code);
     }
     catch (error) {
-        console.error('⚠️ No se pudo enviar el código de verificación:', error);
-        // Opcional: eliminar usuario si falla el correo
+        console.error("⚠️ Error al enviar el correo de verificación:", error);
+        // No revertimos la creación; el usuario ya fue creado. Alternativa: marcar para reintento.
     }
     return newUser;
 };
@@ -85,8 +114,10 @@ const loginUser = async (email, password) => {
     if (!isPasswordValid) {
         throw new Error('Credenciales inválidas');
     }
-    const accessToken = jwt.sign({ userId: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '15m' });
-    const refreshToken = jwt.sign({ userId: user.id }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+    const accessToken = jwt.sign({ userId: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '3h' } // Cambiado de '15m' a '3h'
+    );
+    const refreshToken = jwt.sign({ userId: user.id }, process.env.JWT_REFRESH_SECRET, { expiresIn: '3h' } // Cambiado de '7d' a '3h'
+    );
     return {
         accessToken,
         refreshToken,

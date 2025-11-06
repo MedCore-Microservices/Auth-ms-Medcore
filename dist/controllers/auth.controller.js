@@ -45,14 +45,95 @@ const auth_service_2 = require("./../services/auth.service");
  */
 const register = async (req, res) => {
     try {
-        const { email, password, fullname } = req.body;
-        if (!email || !password || !fullname) {
+        const body = req.body || {};
+        const fromNested = (paths) => {
+            for (const p of paths) {
+                try {
+                    const val = p.split('.').reduce((acc, k) => (acc ? acc[k] : undefined), body);
+                    if (val !== undefined && val !== null && String(val).trim() !== '')
+                        return val;
+                }
+                catch { }
+            }
+            return undefined;
+        };
+        const email = body.email;
+        const password = body.password;
+        const fullname = body.fullname;
+        // Normalización de campos opcionales (admite variantes desde el frontend)
+        const identificationNumber = (() => {
+            const v = fromNested([
+                'identificationNumber',
+                'identification_number',
+                'identificacion',
+                'patient.identificationNumber',
+                'patient.identification_number'
+            ]);
+            return v !== undefined ? String(v).trim() : undefined;
+        })();
+        const dateOfBirth = (() => {
+            const v = fromNested([
+                'dateOfBirth',
+                'dateofBirth',
+                'birthDate',
+                'fechaNacimiento',
+                'patient.dateOfBirth',
+                'patient.birthDate'
+            ]);
+            return v !== undefined ? String(v).trim() : undefined;
+        })();
+        const gender = (() => {
+            const v = fromNested(['gender', 'sexo', 'patient.gender']);
+            return v !== undefined ? String(v).trim() : undefined;
+        })();
+        const phone = (() => {
+            const v = fromNested(['phone', 'phoneNumber', 'telefono', 'patient.phone']);
+            return v !== undefined ? String(v).trim() : undefined;
+        })();
+        // Debug no sensible: solo claves y content-type (evita loguear valores como password)
+        if (process.env.NODE_ENV !== 'production') {
+            try {
+                const keys = Object.keys(req.body || {});
+                // eslint-disable-next-line no-console
+                console.log('[register] content-type:', req.headers['content-type'], 'keys:', keys);
+                // eslint-disable-next-line no-console
+                console.log('[register] normalized fields:', {
+                    hasIdentificationNumber: identificationNumber !== undefined,
+                    identificationNumber,
+                    hasDateOfBirth: dateOfBirth !== undefined,
+                    dateOfBirth,
+                    hasGender: gender !== undefined,
+                    gender,
+                    hasPhone: phone !== undefined,
+                    phone
+                });
+            }
+            catch { }
+        }
+        const missing = [];
+        if (!email)
+            missing.push('email');
+        if (!password)
+            missing.push('password');
+        if (!fullname)
+            missing.push('fullname');
+        if (missing.length > 0) {
             return res.status(400).json({
-                message: 'Email, contraseña y nombre completo son obligatorios.'
+                message: 'Campos obligatorios faltantes',
+                missing
             });
         }
-        // El rol se establece automáticamente como PATIENT en el servicio
-        const newUser = await (0, auth_service_1.registerUser)(email, password, fullname);
+        // Construir payload y pasarlo al servicio
+        const payload = {
+            email,
+            password,
+            fullname,
+            identificationNumber,
+            dateOfBirth,
+            gender,
+            phone
+        };
+        const newUser = await (0, auth_service_1.registerUser)(payload);
         await (0, audit_service_1.logAuditEvent)('USER_REGISTER', {
             email: newUser.email,
             role: newUser.role,
@@ -65,6 +146,11 @@ const register = async (req, res) => {
                 id: newUser.id,
                 email: newUser.email,
                 fullname: newUser.fullname,
+                identificationNumber: newUser.identificationNumber ?? null,
+                dateOfBirth: newUser.dateOfBirth ?? null,
+                age: newUser.age ?? null,
+                gender: newUser.gender ?? null,
+                phone: newUser.phone ?? null,
                 role: newUser.role,
                 createdAt: newUser.createdAt
             }

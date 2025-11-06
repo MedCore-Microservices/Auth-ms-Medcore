@@ -103,6 +103,10 @@ const bulkUploadUsers = async (req, res) => {
         const users = parseFileToUsers(req.file.buffer, req.file.originalname);
         console.log(`Procesando cargue masivo de ${users.length} usuarios desde archivo`);
         const result = await (0, bulk_upload_service_1.bulkCreateUsers)(users);
+        console.log(`Proceso finalizado. Registros exitosos: ${result.success}, Registros fallidos: ${result.errors}`);
+        result.details.forEach((detail) => {
+            console.log(`Fila ${detail.row}: ${detail.message}`);
+        });
         await (0, audit_service_1.logAuditEvent)('BULK_UPLOAD_USERS', {
             total: users.length,
             success: result.success,
@@ -112,8 +116,8 @@ const bulkUploadUsers = async (req, res) => {
             filename: req.file.originalname
         });
         return res.status(200).json({
-            message: `Cargue masivo completado: ${result.success} exitosos, ${result.errors} errores`,
-            ...result
+            message: `Cargue masivo completado. Registros exitosos: ${result.success}, Registros fallidos: ${result.errors}`,
+            details: result.details
         });
     }
     catch (error) {
@@ -125,4 +129,32 @@ const bulkUploadUsers = async (req, res) => {
     }
 };
 exports.bulkUploadUsers = bulkUploadUsers;
+// export const bulkUploadUsers = async (req: Request, res: Response) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({ message: 'Se requiere un archivo' });
+//     }
+//     const users = parseFileToUsers(req.file.buffer, req.file.originalname);
+//     console.log(`Procesando cargue masivo de ${users.length} usuarios desde archivo`);
+//     const result = await bulkCreateUsers(users);
+//     await logAuditEvent('BULK_UPLOAD_USERS', {
+//       total: users.length,
+//       success: result.success,
+//       errors: result.errors,
+//       ip: req.ip,
+//       userAgent: req.get('User-Agent'),
+//       filename: req.file.originalname
+//     });
+//     return res.status(200).json({
+//       message: `Cargue masivo completado: ${result.success} exitosos, ${result.errors} errores`,
+//       ...result
+//     });
+//   } catch (error: any) {
+//     console.error('Error en cargue masivo:', error);
+//     return res.status(400).json({
+//       message: 'Error al procesar el archivo',
+//       error: error.message
+//     });
+//   }
+// };
 //# sourceMappingURL=bulk-upload.controller.js.map

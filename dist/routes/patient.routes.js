@@ -19,9 +19,6 @@ router.put('/:id', auth_middleware_1.authenticateToken, canManagePatients, patie
 // PATCH /api/patients/state/:id → actualizar estado (ACTIVO/INACTIVO)
 router.patch('/state/:id', auth_middleware_1.authenticateToken, canManagePatients, patient_controller_1.updatePatientState);
 // POST /bulk-import → cargue masivo (solo ADMINISTRADOR)
-router.post('/bulk-import', 
-// authenticateToken,
-// authorizeRoles(Role.ADMINISTRADOR),
-upload_middleware_1.upload.single('file'), bulk_upload_controller_1.bulkUploadUsers);
+router.post('/bulk-import', auth_middleware_1.authenticateToken, (0, authorization_middleware_1.authorizeRoles)(client_1.Role.ADMINISTRADOR), upload_middleware_1.upload.single('file'), bulk_upload_controller_1.bulkUploadUsers);
 exports.default = router;
 //# sourceMappingURL=patient.routes.js.map

@@ -8,6 +8,8 @@ import nurseRoutes from './routes/nurse.routes';
 import specializationRoutes from './routes/specialization.routes';
 import doctorRoutes from './routes/doctor.routes';
 import userRoutes from './routes/user.routes';
+import appointmentRoutes from './routes/appointment.routes';
+import scheduleRoutes from './routes/schedule.routes';
 
 dotenv.config();
 const app = express();
@@ -33,6 +35,8 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
+// Soportar application/x-www-form-urlencoded (formularios clásicos)
+app.use(express.urlencoded({ extended: true }));
 
 // Rutas
 app.use('/api/auth', authRoutes);
@@ -42,6 +46,8 @@ app.use('/api/nurses', nurseRoutes);
 app.use('/api/specializations', specializationRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/appointments', appointmentRoutes);
+app.use('/api/schedule', scheduleRoutes);
 
 // Ruta de prueba
 app.get('/', (req, res) => {
