@@ -13,7 +13,8 @@ import scheduleRoutes from './routes/schedule.routes';
 
 dotenv.config();
 const app = express();
-const PORT = 3001;
+// Permitir configurar el puerto vía variable de entorno (docker-compose) y default 3001
+const PORT = Number(process.env.PORT) || 3001;
 
 // ✅ CORS MANUAL - ELIMINA CUALQUIER CONFIGURACIÓN DUPLICADA
 app.use((req, res, next) => {
@@ -56,7 +57,7 @@ app.get('/', (req, res) => {
 
 // ✅ ELIMINAR EL IF PROBLEMÁTICO - INICIAR SERVIDOR DIRECTAMENTE
 app.listen(PORT, () => {
-  console.log(`✅ Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`✅ ms-auth escuchando en http://localhost:${PORT}`);
 });
 
 export default app;
