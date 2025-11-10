@@ -133,6 +133,10 @@ model Appointment {
   status          String         @default("PENDING") // Estado de la cita: PENDING, COMPLETED, CANCELLED
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+
+  @@index([doctorId, date])
+  // Evitar doble reserva exacta en el mismo inicio de slot (mejora de integridad para concurrencia)
+  @@unique([doctorId, date])
 }
 
 model MedicalRecord {
