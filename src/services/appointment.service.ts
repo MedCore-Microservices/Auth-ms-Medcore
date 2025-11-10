@@ -18,7 +18,7 @@ export type UpdateAppointmentInput = {
   medicalRecordId?: number | null;
   date?: Date;
   reason?: string | null;
-  status?: 'PENDING' | 'COMPLETED' | 'CANCELLED';
+  status?: 'PENDING' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
 };
 
 export class AppointmentService {
@@ -85,6 +85,35 @@ export class AppointmentService {
   async cancel(id: number) {
     // Soft delete as cancel
     return prisma.appointment.update({ where: { id }, data: { status: 'CANCELLED' } });
+  }
+
+  // Transiciones de estado soportadas
+  private readonly validTransitions: Record<string, string[]> = {
+    PENDING: ['CONFIRMED', 'IN_PROGRESS', 'CANCELLED', 'NO_SHOW'],
+    CONFIRMED: ['IN_PROGRESS', 'CANCELLED', 'NO_SHOW'],
+    IN_PROGRESS: ['COMPLETED', 'CANCELLED'],
+    COMPLETED: [],
+    CANCELLED: [],
+    NO_SHOW: []
+  };
+
+  async transition(id: number, nextStatus: string) {
+    const appt = await prisma.appointment.findUnique({ where: { id } });
+    if (!appt) {
+      const err: any = new Error('Cita no encontrada');
+      err.code = 'NOT_FOUND';
+      throw err;
+    }
+    const current = (appt.status || 'PENDING').toUpperCase();
+    const target = nextStatus.toUpperCase();
+    const allowed = this.validTransitions[current] || [];
+    if (!allowed.includes(target)) {
+      const err: any = new Error('Transición inválida');
+      err.code = 'INVALID_STATUS';
+      throw err;
+    }
+    // Actualizar
+    return prisma.appointment.update({ where: { id: appt.id }, data: { status: target } });
   }
 }
 

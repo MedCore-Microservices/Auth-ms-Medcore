@@ -107,7 +107,7 @@ export const updateAppointment = async (req: Request, res: Response) => {
 
     if (reason !== undefined) payload.reason = reason ? String(reason) : null;
     if (status !== undefined) {
-      const allowed = ['PENDING', 'COMPLETED', 'CANCELLED'];
+      const allowed = ['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'];
       if (!allowed.includes(status)) return res.status(400).json({ message: 'Estado inválido' });
       payload.status = status;
     }
@@ -132,5 +132,65 @@ export const cancelAppointment = async (req: Request, res: Response) => {
     if (error?.code === 'P2025') return res.status(404).json({ message: 'Cita no encontrada' });
     console.error('Error cancelando cita:', error);
     return res.status(500).json({ message: 'Error al cancelar la cita' });
+  }
+};
+
+// POST /api/appointments/:id/confirm
+export const confirmAppointmentAction = async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ message: 'ID inválido' });
+    const updated = await appointmentService.transition(id, 'CONFIRMED');
+    return res.status(200).json({ message: 'Cita confirmada', appointment: updated });
+  } catch (error: any) {
+    if (error.code === 'NOT_FOUND') return res.status(404).json({ message: 'Cita no encontrada' });
+    if (error.code === 'INVALID_STATUS') return res.status(400).json({ message: 'Transición inválida' });
+    console.error('Error confirmando cita:', error);
+    return res.status(500).json({ message: 'Error al confirmar la cita' });
+  }
+};
+
+// POST /api/appointments/:id/start (o /in-progress)
+export const startAppointmentAction = async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ message: 'ID inválido' });
+    const updated = await appointmentService.transition(id, 'IN_PROGRESS');
+    return res.status(200).json({ message: 'Cita en curso', appointment: updated });
+  } catch (error: any) {
+    if (error.code === 'NOT_FOUND') return res.status(404).json({ message: 'Cita no encontrada' });
+    if (error.code === 'INVALID_STATUS') return res.status(400).json({ message: 'Transición inválida' });
+    console.error('Error iniciando cita:', error);
+    return res.status(500).json({ message: 'Error al iniciar la cita' });
+  }
+};
+
+// POST /api/appointments/:id/complete
+export const completeAppointmentAction = async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ message: 'ID inválido' });
+    const updated = await appointmentService.transition(id, 'COMPLETED');
+    return res.status(200).json({ message: 'Cita completada', appointment: updated });
+  } catch (error: any) {
+    if (error.code === 'NOT_FOUND') return res.status(404).json({ message: 'Cita no encontrada' });
+    if (error.code === 'INVALID_STATUS') return res.status(400).json({ message: 'Transición inválida' });
+    console.error('Error completando cita:', error);
+    return res.status(500).json({ message: 'Error al completar la cita' });
+  }
+};
+
+// POST /api/appointments/:id/mark-no-show
+export const markNoShowAppointmentAction = async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ message: 'ID inválido' });
+    const updated = await appointmentService.transition(id, 'NO_SHOW');
+    return res.status(200).json({ message: 'Paciente no se presentó', appointment: updated });
+  } catch (error: any) {
+    if (error.code === 'NOT_FOUND') return res.status(404).json({ message: 'Cita no encontrada' });
+    if (error.code === 'INVALID_STATUS') return res.status(400).json({ message: 'Transición inválida' });
+    console.error('Error marcando no-show:', error);
+    return res.status(500).json({ message: 'Error al marcar no-show' });
   }
 };
