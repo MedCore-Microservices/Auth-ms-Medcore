@@ -89,8 +89,8 @@ export class AppointmentService {
 
   // Transiciones de estado soportadas
   private readonly validTransitions: Record<string, string[]> = {
-    PENDING: ['CONFIRMED', 'IN_PROGRESS', 'CANCELLED', 'NO_SHOW'],
-    CONFIRMED: ['IN_PROGRESS', 'CANCELLED', 'NO_SHOW'],
+    PENDING: ['CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'],
+    CONFIRMED: ['IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'],
     IN_PROGRESS: ['COMPLETED', 'CANCELLED'],
     COMPLETED: [],
     CANCELLED: [],
